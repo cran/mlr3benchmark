@@ -5,11 +5,12 @@ test_that("construction", {
   expect_silent(BenchmarkAggr$new(df))
   expect_warning(BenchmarkAggr$new(df, independent = FALSE), "independent datasets")
 
-  df = data.frame(task_id = rep(c("A", "B"), each = 5),
-                  learner_id = paste0("regr.", 1:5),
+  df = data.frame(tasks = rep(c("A", "B"), each = 5),
+                  learners = paste0("regr.", 1:5),
                   regr.rmse = runif(10), stringsAsFactors = FALSE)
-  expect_equal(BenchmarkAggr$new(df)$learners, as.character(1:5))
-  expect_equal(BenchmarkAggr$new(df)$measures, "rmse")
+  expect_equal(BenchmarkAggr$new(df, task_id = "tasks", learner_id = "learners")$learners,
+               as.character(1:5))
+  expect_equal(BenchmarkAggr$new(df, task_id = "tasks", learner_id = "learners")$measures, "rmse")
 
   df = data.frame(task_id = rep(c("A", "B"), each = 5),
                   learner_id = paste0("regr.", 1:5),
@@ -35,18 +36,33 @@ test_that("construction", {
 test_that("public methods", {
   set.seed(1)
   rmse = round(runif(10, 1, 5))
-  df = data.frame(task_id = rep(c("A", "B"), each = 5),
-                  learner_id = paste0("L", 1:5),
-                  RMSE = rmse)
-  ba = BenchmarkAggr$new(df)
-  expect_output(print(ba), "10 rows with 2 tasks, 5 learners and 1 measure")
-  expect_output(ba$summary(), "10 rows with 2 tasks, 5 learners and 1 measure")
-  expect_equal(as.numeric(ba$rank_data(ties.method = "first")), c(1, 2, 4, 5, 3, 4, 5, 2, 3, 1))
-  expect_silent(ba$friedman_test())
+  mse = rmse^2
+  df = data.frame(tasks = rep(c("A", "B"), each = 5),
+                  learners = paste0("L", 1:5),
+                  RMSE = rmse, MSE = mse)
+  ba = BenchmarkAggr$new(df, task_id = "tasks", learner_id = "learners")
+  expect_output(print(ba), "10 rows with 2 tasks, 5 learners and 2 measures")
+  expect_output(ba$summary(), "10 rows with 2 tasks, 5 learners and 2 measures")
+  expect_error(as.numeric(ba$rank_data(ties.method = "first")), "Multiple")
+  expect_equal(as.numeric(ba$rank_data(ties.method = "first", meas = "RMSE")),
+               c(1, 2, 4, 5, 3, 4, 5, 2, 3, 1))
+  expect_equal(as.numeric(ba$rank_data(task = "B", ties.method = "first", meas = "RMSE")),
+               c(4, 5, 2, 3, 1))
+  expect_equal(as.numeric(ba$rank_data(task = "B", ties.method = "first", minimize = FALSE,
+                                       meas = "RMSE")),
+               c(1, 2, 3, 4, 5))
+  expect_is(ba$friedman_test(), "data.frame")
+  expect_is(ba$friedman_test(meas = "RMSE"), "htest")
+  expect_equal(ba$subset(task = "A", learner = "L1"),
+               data.table(tasks = factor("A"), learners = factor("L1"), RMSE = 2, MSE = 4))
+  expect_equal(ba$subset(learner = "L3"),
+               data.table(tasks = factor(c("A", "B")), learners = factor(c("L3", "L3")),
+                          RMSE = c(3, 4), MSE = c(9, 16)))
 
   skip_if_not_installed("PMCMR")
-  expect_warning(ba$friedman_posthoc(), "Cannot reject")
-  expect_silent(ba$friedman_posthoc(p.value = 0.9))
+  expect_error(ba$friedman_posthoc(), "measures")
+  expect_warning(ba$friedman_posthoc(meas = "RMSE"), "Cannot reject")
+  expect_silent(ba$friedman_posthoc(p.value = 0.9, meas = "RMSE"))
 })
 
 
@@ -75,4 +91,8 @@ test_that("mlr3 coercions", {
   bm = benchmark(benchmark_grid(task, learns, rsmp("holdout")))
   expect_equal(class(as.BenchmarkAggr(bm))[1], "BenchmarkAggr")
   expect_equal(class(as.BenchmarkAggr(bm, meas = msr("regr.mae")))[1], "BenchmarkAggr")
+  aggr = bm$aggregate(msrs(c("regr.rmse", "regr.mae")))
+  ba = BenchmarkAggr$new(aggr)
+  expect_equal(class(as.BenchmarkAggr(bm))[1], "BenchmarkAggr")
+  expect_equal(ba$measures, c("rmse", "mae"))
 })

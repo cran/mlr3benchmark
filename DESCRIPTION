@@ -1,6 +1,6 @@
 Package: mlr3benchmark
 Title: Analysis and Visualisation of Benchmark Experiments
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: 
     c(person(given = "Sonabend",
            family = "Raphael",
@@ -34,11 +34,11 @@ Suggests: mlr3, mlr3learners, PMCMR, rpart, testthat, xgboost
 Encoding: UTF-8
 NeedsCompilation: no
 RoxygenNote: 7.1.1
-Packaged: 2020-11-14 09:22:55 UTC; raphael
+Packaged: 2020-12-16 09:57:16 UTC; raphael
 Author: Sonabend Raphael [cre, aut] (<https://orcid.org/0000-0001-9225-4654>),
   Florian Pfisterer [aut] (<https://orcid.org/0000-0001-8867-762X>),
   Michel Lang [ctb] (<https://orcid.org/0000-0001-9754-0393>),
   Bernd Bischl [ctb] (<https://orcid.org/0000-0001-6002-6980>)
 Maintainer: Sonabend Raphael <raphael.sonabend.15@ucl.ac.uk>
 Repository: CRAN
-Date/Publication: 2020-11-19 09:10:02 UTC
+Date/Publication: 2020-12-16 12:20:05 UTC

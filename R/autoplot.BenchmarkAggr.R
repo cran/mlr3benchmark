@@ -16,8 +16,8 @@
 #' Critical differences are calculated as:
 #' \deqn{CD = q_{\alpha} \sqrt{\left(\frac{k(k+1)}{6N}\right)}}{CD = q_alpha sqrt(k(k+1)/(6N))}
 #' Where \eqn{q_\alpha} is based on the studentized range statistic.
-#' See references for further details. It's recommended to use [magick::image_trim()] to crop
-#' the white space around the image.
+#' See references for further details.
+#' It's recommended to crop white space using external tools, or function `image_trim()` from package \CRANpkg{magick}.
 #'
 #' @param obj [BenchmarkAggr]
 #' @param type `(character(1))` \cr Type of plot, see description.
@@ -46,8 +46,8 @@
 #' For `type = "fn"`, specifies color to fill significant tiles, default is `"red"`.
 #' @param ... `ANY` \cr Additional arguments, currently unused.
 #'
-#' @references Janez Demsar, Statistical Comparisons of Classifiers over
-#' Multiple Data Sets, JMLR, 2006
+#' @references
+#' `r format_bib("demsar_2006")`
 #'
 #' @examples
 #' if (requireNamespaces(c("mlr3learners", "mlr3", "rpart", "xgboost"))) {
@@ -95,11 +95,13 @@ autoplot.BenchmarkAggr = function(obj, type = c("mean", "box", "fn", "cd"), meas
     if (obj$ntasks < 2) {
       stop("At least two tasks required.")
     }
-    loss = stats::aggregate(as.formula(paste0(meas, " ~ learner_id")), obj$data, mean)
-    se = stats::aggregate(as.formula(paste0(meas, " ~ learner_id")), obj$data, stats::sd)[, 2] / sqrt(obj$ntasks)
+    loss = stats::aggregate(as.formula(paste0(meas, " ~ ", obj$col_roles$learner_id)),
+                            obj$data, mean)
+    se = stats::aggregate(as.formula(paste0(meas, " ~ ", obj$col_roles$learner_id)), obj$data,
+                          stats::sd)[, 2] / sqrt(obj$ntasks)
     loss$lower = loss[, meas] - se * stats::qnorm(1 - (1 - level) / 2)
     loss$upper = loss[, meas] + se * stats::qnorm(1 - (1 - level) / 2)
-    ggplot(data = loss, aes_string(x = "learner_id", y = meas)) +
+    ggplot(data = loss, aes_string(x = obj$col_roles$learner_id, y = meas)) +
       geom_errorbar(aes(ymin = lower, ymax = upper),
                     width = .5) +
       geom_point()
@@ -133,7 +135,7 @@ autoplot.BenchmarkAggr = function(obj, type = c("mean", "box", "fn", "cd"), meas
 
   } else if (type == "box") {
     ggplot(data = obj$data,
-           aes_string(x = "learner_id", y = meas)) +
+           aes_string(x = obj$col_roles$learner_id, y = meas)) +
       geom_boxplot()
   }
 }

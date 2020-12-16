@@ -1,22 +1,24 @@
 #' @title Aggregated Benchmark Result Object
+#'
 #' @description An R6 class for aggregated benchmark results.
 #' @details This class is used to easily carry out and guide analysis of models after aggregating
 #' the results after resampling. This can either be constructed using \CRANpkg{mlr3} objects,
 #' for example the result of [mlr3::BenchmarkResult]`$aggregate` or via [as.BenchmarkAggr],
 #' or by passing in a custom dataset of results. Custom datasets must include at the very least,
-#' column names `learner_id` (for models) and `task_id` (for datasets).
+#' a character column for learner ids, a character column for task ids, and numeric columns for
+#' one or more measures.
 #'
 #' Currently supported for multiple independent datasets only.
 #'
-#' @references Janez Demsar, Statistical Comparisons of Classifiers over
-#' Multiple Data Sets, JMLR, 2006
+#' @references
+#' `r format_bib("demsar_2006")
 #'
 #' @examples
 #' # Not restricted to mlr3 objects
-#' df = data.frame(task_id = rep(c("A", "B"), each = 5),
-#'                 learner_id = paste0("L", 1:5),
+#' df = data.frame(tasks = rep(c("A", "B"), each = 5),
+#'                 learners = paste0("L", 1:5),
 #'                 RMSE = runif(10), MAE = runif(10))
-#' BenchmarkAggr$new(df)
+#' as.BenchmarkAggr(df, task_id = "tasks", learner_id = "learners")
 #'
 #' if (requireNamespaces(c("mlr3", "rpart"))) {
 #'   library(mlr3)
@@ -26,67 +28,65 @@
 #'
 #'   # coercion
 #'   as.BenchmarkAggr(bm)
-#'
-#'   # initialize
-#'   BenchmarkAggr$new(bm$aggregate())
 #' }
 #' @export
 BenchmarkAggr = R6Class("BenchmarkAggr",
   public = list(
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
-    #' @param dt `(matrix(1))` \cr
+    #' @param dt `(matrix(1))` \cr'
     #' `matrix` like object coercable to [data.table::data.table][data.table], should
     #' include column names "task_id" and "learner_id", and at least one measure (numeric).
     #' If ids are not already factors then coerced internally.
+    #' @param task_id (`character(1)`) \cr
+    #' String specifying name of task id column.
+    #' @param learner_id (`character(1)`)\cr
+    #' String specifying name of learner id column.
     #' @param independent `(logical(1))` \cr
     #' Are tasks independent of one another? Affects which tests can be used for analysis.
     #' @param strip_prefix (`logical(1)`) \cr
     #' If `TRUE` (default) then mlr prefixes, e.g. `regr.`, `classif.`, are automatically
     #' stripped from the `learner_id`.
-    #' @param ... `ANY` \cr Additional arguments, currently unused.
-    initialize = function(dt, independent = TRUE, strip_prefix = TRUE, ...) {
-      dt = as.data.table(dt)
+    #' @param ... `ANY` \cr
+    #' Additional arguments, currently unused.
+    initialize = function(dt, task_id = "task_id", learner_id = "learner_id",
+                          independent = TRUE, strip_prefix = TRUE, ...) {
+      if (!is.data.table(dt))
+        dt = as.data.table(dt)
 
-      private$.independent = assert_logical(independent)
+      private$.independent = assert_flag(independent)
+      assert_flag(strip_prefix)
+      assert_subset(c(task_id, learner_id), colnames(dt))
+      private$.col_roles = list(task_id = task_id, learner_id = learner_id)
+      dt[, (c(task_id, learner_id)) := lapply(.SD, factor), .SDcols = c(task_id, learner_id)]
+      measure_ids = setdiff(colnames(dt), c(task_id, learner_id, "nr", "resample_result",
+                                            "resampling_id", "iters"))
+
+      if (length(measure_ids) == 0L) {
+        stop("At least one measure must be included in `dt`.")
+      }
+
+      dt = dt[, c(task_id, learner_id, measure_ids), with = FALSE]
+      # confirm all measures numeric
+      assert_data_frame(dt[, measure_ids, with = FALSE], types = "numeric")
+
       if (!independent) {
         warning("Currently only methods for independent datasets are supported.")
       }
 
-      # at the very least should include task_id, learner_id, and one measure
-      assert(all(c("task_id", "learner_id") %in% colnames(dt)))
-
-
-      if (any(duplicated(dt[, c("task_id", "learner_id")]))) {
+      if (anyDuplicated(dt, by = c(task_id, learner_id))) {
         stop("Multiple results for a learner-task combination detected. There should be exactly one row for each learner-task combination.") # nolint
       }
 
-      # TODO - The line below could be removed if there is a use for this extra data,
-      # for now there isn't in this object.
-      dt = subset(dt, select = setdiff(colnames(dt),
-                            c("nr", "task", "learner", "resampling", "resampling_id",
-                              "iteration", "prediction", "resample_result", "iters")))
-
-      if (ncol(dt) < 3) {
-        stop("At least one measure must be included in `dt`.")
-      }
-
-      # check measures are numeric
-      sapply(dt[, setdiff(colnames(dt), c("task_id", "learner_id")), with = FALSE], assert_numeric)
-
       if (strip_prefix) {
-        if (!test_factor(dt$learner_id)) {
-          dt$learner_id = gsub("regr\\.|classif\\.|surv\\.|dens\\.|clust\\.", "", dt$learner_id)
+        if (isNamespaceLoaded("mlr3")) {
+          types = mlr3::mlr_reflections$task_types$type
+        } else {
+          types = c("regr", "classif", "surv", "dens", "clust")
         }
-        colnames(dt) = gsub("regr\\.|classif\\.|surv\\.|dens\\.|clust\\.", "", colnames(dt))
-      }
-
-      if (!test_factor(dt$task_id)) {
-        dt$task_id = factor(assert_character(dt$task_id), levels = unique(dt$task_id))
-      }
-
-      if (!test_factor(dt$learner_id)) {
-        dt$learner_id = factor(assert_character(dt$learner_id), levels = unique(dt$learner_id))
+        pattern = sprintf("^(%s)\\.", paste0(types, collapse = "|"))
+        levels(dt[[learner_id]]) = gsub(pattern, "", levels(dt[[learner_id]]))
+        colnames(dt) = gsub(pattern, "", colnames(dt))
       }
 
       private$.dt = dt
@@ -130,28 +130,26 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
     #' @param ... `ANY` `ANY` \cr Passed to [data.table::frank()].
     rank_data = function(meas = NULL, minimize = TRUE, task = NULL, ...) {
       meas = .check_meas(self, meas)
-      df = subset(private$.dt, select = c("task_id", meas))
-      lrns = self$learners
-      nr = self$nlrns
+      df = private$.dt[ , c(self$col_roles$task_id, meas), with = FALSE]
 
       if (!minimize) {
         df[[meas]] = -df[[meas]]
       }
 
       if (!is.null(task)) {
-        df = subset(df, task_id == task)
+        df = df[get(self$col_roles$task_id) == task]
         rdf = matrix(data.table::frank(subset(df, select = meas), ...), ncol = 1)
         colnames(rdf) = task
       } else {
-        tasks = self$tasks
-        rdf = matrix(nrow = nr, ncol = self$ntasks)
-        for (i in seq_along(tasks)) {
-          rdf[, i] = data.table::frank(subset(df, task_id == tasks[[i]], select = meas), ...)
+        rdf = matrix(nrow = self$nlrns, ncol = self$ntasks)
+        for (i in seq_along(self$tasks)) {
+          rdf[, i] = data.table::frank(subset(df, get(self$col_roles$task_id) == self$tasks[[i]],
+                                              select = meas), ...)
         }
-        colnames(rdf) = tasks
+        colnames(rdf) = self$tasks
       }
 
-      rownames(rdf) = lrns
+      rownames(rdf) = self$learners
       rdf
     },
 
@@ -172,19 +170,22 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
         stop("At least two tasks are required")
       }
 
-      if (!is.null(meas)) {
-        return(friedman.test(as.formula(paste0(meas, " ~ learner_id | task_id", sep = "")),
+      if (!is.null(meas) || (is.null(meas) && self$nmeas == 1)) {
+        if (is.null(meas)) meas = self$measures
+        return(stats::friedman.test(as.formula(paste0(meas, " ~ ", self$col_roles$learner_id, " | ",
+                                                      self$col_roles$task_id)),
                       data = private$.dt))
       } else {
         x = sapply(self$measures, function(x)
-          friedman.test(as.formula(paste0(x, " ~ learner_id | task_id", sep = "")),
+          stats::friedman.test(as.formula(paste0(x, " ~ ", self$col_roles$learner_id, " | ",
+                                                 self$col_roles$task_id)),
                        data = private$.dt))
         x = data.frame(t(x[1:3, ]))
         colnames(x) = c("X2", "df", "p.value")
         rownames(x) = self$measures
 
         if (!is.null(p.adjust.method)) {
-          x$p.adj.value = p.adjust(x$p.value, p.adjust.method) # nolint
+          x$p.adj.value = stats::p.adjust(x$p.value, p.adjust.method) # nolint
           x$p.signif = ifelse(x$p.adj.value <= 0.001, "***", # nolint
                               ifelse(x$p.adj.value <= 0.01, "**",
                                      ifelse(x$p.adj.value <= 0.05, "*",
@@ -234,7 +235,8 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
       }
 
       if (f.rejnull) {
-        form = as.formula(paste0(meas, " ~ learner_id | task_id", sep = ""))
+        form = as.formula(paste0(meas, " ~ ", self$col_roles$learner_id, " | ",
+                                 self$col_roles$task_id))
         nem_test = PMCMR::posthoc.friedman.nemenyi.test(form, data = private$.dt) # nolint
         nem_test$f.rejnull = f.rejnull # nolint
         return(nem_test)
@@ -242,6 +244,23 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
         f.test$f.rejnull = f.rejnull # nolint
         return(f.test)
       }
+    },
+
+    #' @description Subsets the data by given tasks or learners.
+    #' Returns data as [data.table::data.table].
+    #' @param task (`character()`) \cr
+    #' Task(s) to subset the data by.
+    #' @param learner (`character()`) \cr
+    #' Learner(s) to subset the data by.
+    subset = function(task = NULL, learner = NULL) {
+      dt = private$.dt
+
+      if (!is.null(task))
+        dt = subset(dt, get(self$col_roles$task_id) == task)
+      if (!is.null(learner))
+        dt = dt[get(self$col_roles$learner_id) == learner]
+
+      dt
     }
   ),
 
@@ -249,24 +268,28 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
     #' @field data ([data.table::data.table]) \cr Aggregated data.
     data = function() private$.dt,
     #' @field learners `(character())` \cr Unique learner names.
-    learners = function() as.character(unique(private$.dt$learner_id)),
+    learners = function() levels(private$.dt[[self$col_roles$learner_id]]),
     #' @field tasks `(character())` \cr Unique task names.
-    tasks = function() as.character(unique(private$.dt$task_id)),
+    tasks = function() levels(private$.dt[[self$col_roles$task_id]]),
     #' @field measures `(character())` \cr Unique measure names.
-    measures = function() {
-      setdiff(colnames(private$.dt), c("task_id", "learner_id"))
-    },
-    #' @field nlrns `(integers())` \cr Number of learners.
-    nlrns = function() length(self$learners),
-    #' @field ntasks `(integers())` \cr Number of tasks.
-    ntasks = function() length(self$tasks),
-    #' @field nmeas `(integers())` \cr Number of measures.
-    nmeas = function() length(self$measures),
-    #' @field nrow `(integers())` \cr Number of rows.
-    nrow = function() nrow(self$data)
+    measures = function() setdiff(colnames(private$.dt), unlist(self$col_roles)),
+    #' @field nlrns `(integer())` \cr Number of learners.
+    nlrns = function() nlevels(private$.dt[[self$col_roles$learner_id]]),
+    #' @field ntasks `(integer())` \cr Number of tasks.
+    ntasks = function() nlevels(private$.dt[[self$col_roles$task_id]]),
+    #' @field nmeas `(integer())` \cr Number of measures.
+    nmeas = function() ncol(private$.dt) - 2L,
+    #' @field nrow `(integer())` \cr Number of rows.
+    nrow = function() nrow(self$data),
+    #' @field col_roles (`character()`) \cr
+    #' Column roles, currently cannot be changed after construction.
+    col_roles = function() {
+      private$.col_roles
+    }
   ),
 
   private = list(
+    .col_roles = character(0),
     .dt = data.table(),
     .independent = logical(0),
     .crit_differences = function(meas = NULL, minimize = TRUE, p.value = 0.05, baseline = NULL, # nolint
@@ -282,8 +305,9 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
       df = data.frame(mean_rank,
                       learner_id = names(mean_rank),
                       rank = rank(mean_rank, ties.method = "average"))
+      colnames(df)[2] = self$col_roles$learner_id
       # Orientation of descriptive lines yend(=y-value of horizontal line)
-      right = df$rank > median(df$rank)
+      right = df$rank > stats::median(df$rank)
       # Better learners are ranked ascending
       df$yend[!right] = rank(df$rank[!right], ties.method = "first") + 1
       # Worse learners ranked descending
@@ -300,10 +324,10 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
 
       # calculate critical difference(s)
       if (test == "nemenyi") {
-        cd = (qtukey(1 - p.value, self$nlrns, 1e+06) / sqrt(2L)) *
+        cd = (stats::qtukey(1 - p.value, self$nlrns, 1e+06) / sqrt(2L)) *
           sqrt(self$nlrns * (self$nlrns + 1L) / (6L * self$ntasks))
       } else {
-        cd = (qtukey(1L - (p.value / (self$nlrns - 1L)), 2L, 1e+06) / sqrt(2L)) *
+        cd = (stats::qtukey(1L - (p.value / (self$nlrns - 1L)), 2L, 1e+06) / sqrt(2L)) *
           sqrt(self$nlrns * (self$nlrns + 1L) / (6L * self$ntasks))
       }
 
@@ -324,21 +348,21 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
         # Take only bars with length > 0
         nem_df = nem_df[nem_df$diff > 0, ] # nolint
         # Descriptive lines for learners start at 0.5, 1.5, ...
-        nem_df$y = c(seq(from = 0.5, by = 0.5,
-                         length.out = sum(nem_df$xstart <= median(df$mean_rank))),
-                     seq(from = 0.5, by = 0.5,
-                         length.out = sum(nem_df$xstart > median(df$mean_rank))))
+        rank_y = rank(c(seq.int(length.out = sum(nem_df$xstart <= stats::median(df$mean_rank))),
+                     seq.int(length.out = sum(nem_df$xstart > stats::median(df$mean_rank)))),
+                     ties.method = "first")
+        nem_df$y = seq.int(from = 0.5, by = 0.5, length.out = nrow(nem_df))[rank_y]
 
         out$nemenyi_data = as.data.frame(nem_df) # nolint
       } else {
         # Get a baseline
         if (is.null(baseline)) {
-          baseline = as.character(df$learner_id[which.min(df$rank)])
+          baseline = as.character(df[[self$col_roles$learner_id]][which.min(df$rank)])
         } else {
           assert_choice(baseline, self$learners)
         }
 
-        out$data$baseline = as.numeric(baseline == df$learner_id)
+        out$data$baseline = as.numeric(baseline == df[[self$col_roles$learner_id]])
       }
 
       out
@@ -347,17 +371,19 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
 )
 
 #' @title Coercions to BenchmarkAggr
+#'
 #' @description Coercion methods to [BenchmarkAggr]. For [mlr3::BenchmarkResult] this is a simple
 #' wrapper around the [BenchmarkAggr] constructor called with [mlr3::BenchmarkResult]`$aggregate()`.
+#'
 #' @param obj ([mlr3::BenchmarkResult]|`matrix(1)`) \cr Passed to [BenchmarkAggr]`$new()`.
-#' @param independent,strip_prefix See [BenchmarkAggr]`$initialize()`.
+#' @param task_id,learner_id,independent,strip_prefix See [BenchmarkAggr]`$initialize()`.
 #' @param ... `ANY` \cr Passed to [mlr3::BenchmarkResult]`$aggregate()`.
 #' @examples
-#' df = data.frame(task_id = rep(c("A", "B"), each = 5),
-#'                 learner_id = paste0("L", 1:5),
+#' df = data.frame(tasks = rep(c("A", "B"), each = 5),
+#'                 learners = paste0("L", 1:5),
 #'                 RMSE = runif(10), MAE = runif(10))
 #'
-#' as.BenchmarkAggr(df)
+#' as.BenchmarkAggr(df, task_id = "tasks", learner_id = "learners")
 #'
 #'
 #' if (requireNamespaces(c("mlr3", "rpart"))) {
@@ -370,18 +396,30 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
 #'   as.BenchmarkAggr(bm)
 #'
 #'   # change measure
-#'   as.BenchmarkAggr(bm, measure = msr("regr.rmse"))
+#'   as.BenchmarkAggr(bm, measures = msr("regr.rmse"))
 #' }
 #'
 #' @export
-as.BenchmarkAggr = function(obj, independent = TRUE, strip_prefix = TRUE, ...) { # nolint
+as.BenchmarkAggr = function(obj, task_id = "task_id", learner_id = "learner_id",
+                            independent = TRUE, strip_prefix = TRUE, ...) { # nolint
   UseMethod("as.BenchmarkAggr", obj)
 }
+
 #' @export
-as.BenchmarkAggr.default = function(obj, independent = TRUE, strip_prefix = TRUE, ...) { # nolint
-  BenchmarkAggr$new(obj, independent, strip_prefix)
+as.BenchmarkAggr.default = function(obj, task_id = "task_id", learner_id = "learner_id",
+                                    independent = TRUE, strip_prefix = TRUE, ...) { # nolint
+  BenchmarkAggr$new(as.data.table(obj), task_id = task_id, learner_id = learner_id,
+                    independent = independent, strip_prefix = strip_prefix)
 }
+
 #' @export
-as.BenchmarkAggr.BenchmarkResult = function(obj, independent = TRUE, strip_prefix = TRUE, ...) { # nolint
-  BenchmarkAggr$new(obj$aggregate(...), independent, strip_prefix)
+as.BenchmarkAggr.BenchmarkResult = function(obj, task_id = "task_id", learner_id = "learner_id",
+                                            independent = TRUE, strip_prefix = TRUE,
+                                            measures = NULL, ...) { # nolint
+  requireNamespaces("mlr3")
+  measures = mlr3::as_measures(measures, task_type = obj$task_type)
+  tab = obj$aggregate(measures = measures)
+  cols = c("task_id", "learner_id", map_chr(measures, "id"))
+  BenchmarkAggr$new(tab[, cols, with = FALSE], independent = independent,
+                    strip_prefix = strip_prefix)
 }

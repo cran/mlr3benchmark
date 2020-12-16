@@ -11,16 +11,17 @@ This class is used to easily carry out and guide analysis of models after aggreg
 the results after resampling. This can either be constructed using \CRANpkg{mlr3} objects,
 for example the result of \link[mlr3:BenchmarkResult]{mlr3::BenchmarkResult}\verb{$aggregate} or via \link{as.BenchmarkAggr},
 or by passing in a custom dataset of results. Custom datasets must include at the very least,
-column names \code{learner_id} (for models) and \code{task_id} (for datasets).
+a character column for learner ids, a character column for task ids, and numeric columns for
+one or more measures.
 
 Currently supported for multiple independent datasets only.
 }
 \examples{
 # Not restricted to mlr3 objects
-df = data.frame(task_id = rep(c("A", "B"), each = 5),
-                learner_id = paste0("L", 1:5),
+df = data.frame(tasks = rep(c("A", "B"), each = 5),
+                learners = paste0("L", 1:5),
                 RMSE = runif(10), MAE = runif(10))
-BenchmarkAggr$new(df)
+as.BenchmarkAggr(df, task_id = "tasks", learner_id = "learners")
 
 if (requireNamespaces(c("mlr3", "rpart"))) {
   library(mlr3)
@@ -30,14 +31,10 @@ if (requireNamespaces(c("mlr3", "rpart"))) {
 
   # coercion
   as.BenchmarkAggr(bm)
-
-  # initialize
-  BenchmarkAggr$new(bm$aggregate())
 }
 }
 \references{
-Janez Demsar, Statistical Comparisons of Classifiers over
-Multiple Data Sets, JMLR, 2006
+`r format_bib("demsar_2006")
 }
 \section{Active bindings}{
 \if{html}{\out{<div class="r6-active-bindings">}}
@@ -50,13 +47,16 @@ Multiple Data Sets, JMLR, 2006
 
 \item{\code{measures}}{\code{(character())} \cr Unique measure names.}
 
-\item{\code{nlrns}}{\code{(integers())} \cr Number of learners.}
+\item{\code{nlrns}}{\code{(integer())} \cr Number of learners.}
 
-\item{\code{ntasks}}{\code{(integers())} \cr Number of tasks.}
+\item{\code{ntasks}}{\code{(integer())} \cr Number of tasks.}
 
-\item{\code{nmeas}}{\code{(integers())} \cr Number of measures.}
+\item{\code{nmeas}}{\code{(integer())} \cr Number of measures.}
 
-\item{\code{nrow}}{\code{(integers())} \cr Number of rows.}
+\item{\code{nrow}}{\code{(integer())} \cr Number of rows.}
+
+\item{\code{col_roles}}{(\code{character()}) \cr
+Column roles, currently cannot be changed after construction.}
 }
 \if{html}{\out{</div>}}
 }
@@ -69,6 +69,7 @@ Multiple Data Sets, JMLR, 2006
 \item \href{#method-rank_data}{\code{BenchmarkAggr$rank_data()}}
 \item \href{#method-friedman_test}{\code{BenchmarkAggr$friedman_test()}}
 \item \href{#method-friedman_posthoc}{\code{BenchmarkAggr$friedman_posthoc()}}
+\item \href{#method-subset}{\code{BenchmarkAggr$subset()}}
 \item \href{#method-clone}{\code{BenchmarkAggr$clone()}}
 }
 }
@@ -78,16 +79,29 @@ Multiple Data Sets, JMLR, 2006
 \subsection{Method \code{new()}}{
 Creates a new instance of this \link[R6:R6Class]{R6} class.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{BenchmarkAggr$new(dt, independent = TRUE, strip_prefix = TRUE, ...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{BenchmarkAggr$new(
+  dt,
+  task_id = "task_id",
+  learner_id = "learner_id",
+  independent = TRUE,
+  strip_prefix = TRUE,
+  ...
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{dt}}{\code{(matrix(1))} \cr
+\item{\code{dt}}{\code{(matrix(1))} \cr'
 \code{matrix} like object coercable to \link[=data.table]{data.table::data.table}, should
 include column names "task_id" and "learner_id", and at least one measure (numeric).
 If ids are not already factors then coerced internally.}
+
+\item{\code{task_id}}{(\code{character(1)}) \cr
+String specifying name of task id column.}
+
+\item{\code{learner_id}}{(\code{character(1)})\cr
+String specifying name of learner id column.}
 
 \item{\code{independent}}{\code{(logical(1))} \cr
 Are tasks independent of one another? Affects which tests can be used for analysis.}
@@ -96,7 +110,8 @@ Are tasks independent of one another? Affects which tests can be used for analys
 If \code{TRUE} (default) then mlr prefixes, e.g. \code{regr.}, \code{classif.}, are automatically
 stripped from the \code{learner_id}.}
 
-\item{\code{...}}{\code{ANY} \cr Additional arguments, currently unused.}
+\item{\code{...}}{\code{ANY} \cr
+Additional arguments, currently unused.}
 }
 \if{html}{\out{</div>}}
 }
@@ -207,6 +222,28 @@ in data.}
 
 \item{\code{p.value}}{\code{(numeric(1))} \cr
 p.value for which the global test will be considered significant.}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-subset"></a>}}
+\if{latex}{\out{\hypertarget{method-subset}{}}}
+\subsection{Method \code{subset()}}{
+Subsets the data by given tasks or learners.
+Returns data as \link[data.table:data.table]{data.table::data.table}.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{BenchmarkAggr$subset(task = NULL, learner = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{task}}{(\code{character()}) \cr
+Task(s) to subset the data by.}
+
+\item{\code{learner}}{(\code{character()}) \cr
+Learner(s) to subset the data by.}
 }
 \if{html}{\out{</div>}}
 }

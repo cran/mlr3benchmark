@@ -1,9 +1,8 @@
-README
-================
 
 # mlr3benchmark
 
-Analysis and tools for benchmarking in mlr3.
+Analysis and tools for benchmarking in
+[mlr3](https://github.com/mlr-org/mlr3).
 
 <!-- badges: start -->
 
@@ -33,11 +32,10 @@ Then **mlr3benchmark** is the answer, or at least will be once it’s
 finished maturing.
 
 **mlr3benchmark** enables fast and efficient analysis of benchmark
-experiments in just a few lines of code and you are not limited to
-analysing experiments from [mlr3](https://github.com/mlr-org/mlr3). As
-long as you can coerce your results into a format fitting our classes
-(which have very few requirements), then you can perform your benchmark
-analysis with **mlr3benchmark**.
+experiments in just a few lines of code. As long as you can coerce your
+results into a format fitting our classes (which have very few
+requirements), then you can perform your benchmark analysis with
+**mlr3benchmark**.
 
 ## Installation
 
@@ -148,13 +146,13 @@ have the highest rank and are the best performing, and decrease going
 right. The thick horizontal lines connect learners that are *not*
 significantly difference in ranked performance, so this tells us:
 
-1)  xgboost is significantly better than featureless
-2)  xgboost is not significantly better than rpart
-3)  rpart is not significantly better than featureless
+1.  xgboost is significantly better than featureless
+2.  xgboost is not significantly better than rpart
+3.  rpart is not significantly better than featureless
 
 Now we visualise two much simpler plots which display similar
 information, the first is the mean and standard error of the results
-across all tasks, the second is a boxplot results across all tasks:
+across all tasks, the second is a boxplot across all tasks:
 
 ``` r
 autoplot(ba, meas = "acc")
