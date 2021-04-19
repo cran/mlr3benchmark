@@ -15,8 +15,9 @@
 #'
 #' @examples
 #' # Not restricted to mlr3 objects
-#' df = data.frame(tasks = rep(c("A", "B"), each = 5),
-#'                 learners = paste0("L", 1:5),
+#' df = data.frame(tasks = factor(rep(c("A", "B"), each = 5),
+#'                                levels = c("A", "B")),
+#'                 learners = factor(paste0("L", 1:5)),
 #'                 RMSE = runif(10), MAE = runif(10))
 #' as.BenchmarkAggr(df, task_id = "tasks", learner_id = "learners")
 #'
@@ -51,14 +52,18 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
     #' Additional arguments, currently unused.
     initialize = function(dt, task_id = "task_id", learner_id = "learner_id",
                           independent = TRUE, strip_prefix = TRUE, ...) {
-      if (!is.data.table(dt))
+
+       if (!is.data.table(dt)) {
         dt = as.data.table(dt)
+      }
 
       private$.independent = assert_flag(independent)
       assert_flag(strip_prefix)
       assert_subset(c(task_id, learner_id), colnames(dt))
+      assert_factor(unlist(subset(dt, select = task_id)))
+      assert_factor(unlist(subset(dt, select = learner_id)))
+
       private$.col_roles = list(task_id = task_id, learner_id = learner_id)
-      dt[, (c(task_id, learner_id)) := lapply(.SD, factor), .SDcols = c(task_id, learner_id)]
       measure_ids = setdiff(colnames(dt), c(task_id, learner_id, "nr", "resample_result",
                                             "resampling_id", "iters"))
 
@@ -379,8 +384,9 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
 #' @param task_id,learner_id,independent,strip_prefix See [BenchmarkAggr]`$initialize()`.
 #' @param ... `ANY` \cr Passed to [mlr3::BenchmarkResult]`$aggregate()`.
 #' @examples
-#' df = data.frame(tasks = rep(c("A", "B"), each = 5),
-#'                 learners = paste0("L", 1:5),
+#' df = data.frame(tasks = factor(rep(c("A", "B"), each = 5),
+#'                                levels = c("A", "B")),
+#'                 learners = factor(paste0("L", 1:5)),
 #'                 RMSE = runif(10), MAE = runif(10))
 #'
 #' as.BenchmarkAggr(df, task_id = "tasks", learner_id = "learners")
@@ -420,6 +426,8 @@ as.BenchmarkAggr.BenchmarkResult = function(obj, task_id = "task_id", learner_id
   measures = mlr3::as_measures(measures, task_type = obj$task_type)
   tab = obj$aggregate(measures = measures)
   cols = c("task_id", "learner_id", map_chr(measures, "id"))
+  tab$task_id = factor(tab$task_id, levels = unique(tab$task_id))
+  tab$learner_id = factor(tab$learner_id, levels = unique(tab$learner_id))
   BenchmarkAggr$new(tab[, cols, with = FALSE], independent = independent,
                     strip_prefix = strip_prefix)
 }

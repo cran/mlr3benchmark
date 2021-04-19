@@ -1,3 +1,9 @@
+# mlr3benchmark 0.1.2
+
+* Critical patch for bug in creating BenchmarkAggr objects.
+* Task and learner columns must now be provided as factors to BenchmarkAggr objects, no internal coercion is made.
+* Bug fix in CD plots
+
 # mlr3benchmark 0.1.1
 
 * BenchmarkAggr$friedman_test now returns the full test object if only a single measure exists in the object
