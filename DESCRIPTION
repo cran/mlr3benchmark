@@ -1,10 +1,10 @@
 Package: mlr3benchmark
 Title: Analysis and Visualisation of Benchmark Experiments
-Version: 0.1.3
+Version: 0.1.4
 Authors@R: 
     c(person(given = "Sonabend",
            family = "Raphael",
-           role = c("cre", "aut"),
+           role = "aut",
            email = "raphaelsonabend@gmail.com",
            comment = c(ORCID = "0000-0001-9225-4654")),
       person(given = "Florian",
@@ -21,7 +21,12 @@ Authors@R:
              family = "Bischl",
              role = "ctb",
              email = "bernd_bischl@gmx.net",
-             comment = c(ORCID = "0000-0001-6002-6980")))
+             comment = c(ORCID = "0000-0001-6002-6980")),
+      person(given = "Sebastian",
+             family = "Fischer",
+             role = c("cre", "ctb"),
+             email = "sebf.fischer@gmail.com",
+             comment = c(ORCID = "0000-0002-9609-3197")))
 Description: Implements methods for post-hoc analysis and
     visualisation of benchmark experiments, for 'mlr3' and beyond.
 License: LGPL-3
@@ -33,12 +38,13 @@ Imports: checkmate, data.table, ggplot2, mlr3misc, R6
 Suggests: mlr3, mlr3learners, PMCMRplus, rpart, testthat, xgboost
 Encoding: UTF-8
 NeedsCompilation: no
-RoxygenNote: 7.1.1
-Packaged: 2021-10-04 15:07:31 UTC; raphaelsonabend
-Author: Sonabend Raphael [cre, aut] (<https://orcid.org/0000-0001-9225-4654>),
+RoxygenNote: 7.2.1
+Packaged: 2022-10-10 14:48:49 UTC; sebi
+Author: Sonabend Raphael [aut] (<https://orcid.org/0000-0001-9225-4654>),
   Florian Pfisterer [aut] (<https://orcid.org/0000-0001-8867-762X>),
   Michel Lang [ctb] (<https://orcid.org/0000-0001-9754-0393>),
-  Bernd Bischl [ctb] (<https://orcid.org/0000-0001-6002-6980>)
-Maintainer: Sonabend Raphael <raphaelsonabend@gmail.com>
+  Bernd Bischl [ctb] (<https://orcid.org/0000-0001-6002-6980>),
+  Sebastian Fischer [cre, ctb] (<https://orcid.org/0000-0002-9609-3197>)
+Maintainer: Sebastian Fischer <sebf.fischer@gmail.com>
 Repository: CRAN
-Date/Publication: 2021-10-04 15:30:02 UTC
+Date/Publication: 2022-10-10 18:50:10 UTC

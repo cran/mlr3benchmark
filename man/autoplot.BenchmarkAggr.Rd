@@ -16,6 +16,7 @@
   style = 1L,
   ratio = 1/7,
   col = "red",
+  friedman_global = TRUE,
   ...
 )
 }
@@ -56,7 +57,15 @@ specifying the aspect ratio of the plot, best used with \code{\link[=ggsave]{ggs
 \item{col}{(\code{character(1)})\cr
 For \code{type = "fn"}, specifies color to fill significant tiles, default is \code{"red"}.}
 
+\item{friedman_global}{(\code{logical(1)})\cr
+Should a friedman global test be performed for\code{type = "cd"} and \code{type = "fn"}?
+If \code{FALSE}, a warning is issued in case the corresponding friedman posthoc test fails instead of an error.
+Default is \code{TRUE} (raises an error if global test fails).}
+
 \item{...}{\code{ANY} \cr Additional arguments, currently unused.}
+}
+\value{
+The generated plot.
 }
 \description{
 Generates plots for \link{BenchmarkAggr}, all assume that there are multiple, independent, tasks.
