@@ -1,3 +1,7 @@
+# mlr3benchmark 0.1.6
+
+* Renamed `as.BenchmarkAggr` to `as_benchmark_aggr()` for consistency. The former still works but is deprecated.
+
 # mlr3benchmark 0.1.5
 
 * Rename argument of autoplot function to comply with new CRAN check
