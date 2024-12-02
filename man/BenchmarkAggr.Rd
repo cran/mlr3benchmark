@@ -26,8 +26,8 @@ as_benchmark_aggr(df, task_id = "tasks", learner_id = "learners")
 
 if (requireNamespaces(c("mlr3", "rpart"))) {
   library(mlr3)
-  task = tsks(c("boston_housing", "mtcars"))
-  learns = lrns(c("regr.featureless", "regr.rpart"))
+  task = tsks(c("pima", "spam"))
+  learns = lrns(c("classif.featureless", "classif.rpart"))
   bm = benchmark(benchmark_grid(task, learns, rsmp("cv", folds = 2)))
 
   # coercion
@@ -35,7 +35,10 @@ if (requireNamespaces(c("mlr3", "rpart"))) {
 }
 }
 \references{
-`r format_bib("demsar_2006")
+Demšar J (2006).
+\dQuote{Statistical Comparisons of Classifiers over Multiple Data Sets.}
+\emph{Journal of Machine Learning Research}, \bold{7}(1), 1-30.
+\url{https://jmlr.org/papers/v7/demsar06a.html}.
 }
 \section{Active bindings}{
 \if{html}{\out{<div class="r6-active-bindings">}}
@@ -93,8 +96,8 @@ Creates a new instance of this \link[R6:R6Class]{R6} class.
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{dt}}{\code{(matrix(1))} \cr'
-\code{matrix} like object coercable to \link[=data.table]{data.table::data.table}, should
+\item{\code{dt}}{\code{(matrix(1))}\cr
+A \code{matrix} like object coercable to \link[data.table:data.table]{data.table::data.table}, should
 include column names "task_id" and "learner_id", and at least one measure (numeric).
 If ids are not already factors then coerced internally.}
 

@@ -11,7 +11,7 @@
 #' Currently supported for multiple independent datasets only.
 #'
 #' @references
-#' `r format_bib("demsar_2006")
+#' `r format_bib("demsar_2006")`
 #'
 #' @examples
 #' # Not restricted to mlr3 objects
@@ -23,8 +23,8 @@
 #'
 #' if (requireNamespaces(c("mlr3", "rpart"))) {
 #'   library(mlr3)
-#'   task = tsks(c("boston_housing", "mtcars"))
-#'   learns = lrns(c("regr.featureless", "regr.rpart"))
+#'   task = tsks(c("pima", "spam"))
+#'   learns = lrns(c("classif.featureless", "classif.rpart"))
 #'   bm = benchmark(benchmark_grid(task, learns, rsmp("cv", folds = 2)))
 #'
 #'   # coercion
@@ -35,8 +35,8 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
   public = list(
     #' @description
     #' Creates a new instance of this [R6][R6::R6Class] class.
-    #' @param dt `(matrix(1))` \cr'
-    #' `matrix` like object coercable to [data.table::data.table][data.table], should
+    #' @param dt `(matrix(1))`\cr
+    #' A `matrix` like object coercable to [data.table::data.table], should
     #' include column names "task_id" and "learner_id", and at least one measure (numeric).
     #' If ids are not already factors then coerced internally.
     #' @param task_id (`character(1)`) \cr
@@ -417,15 +417,15 @@ BenchmarkAggr = R6Class("BenchmarkAggr",
 #'
 #' if (requireNamespaces(c("mlr3", "rpart"))) {
 #'   library(mlr3)
-#'   task = tsks(c("boston_housing", "mtcars"))
-#'   learns = lrns(c("regr.featureless", "regr.rpart"))
+#'   task = tsks(c("pima", "spam"))
+#'   learns = lrns(c("classif.featureless", "classif.rpart"))
 #'   bm = benchmark(benchmark_grid(task, learns, rsmp("cv", folds = 2)))
 #'
 #'   # default measure
 #'   as_benchmark_aggr(bm)
 #'
 #'   # change measure
-#'   as_benchmark_aggr(bm, measures = msr("regr.rmse"))
+#'   as_benchmark_aggr(bm, measures = msr("classif.acc"))
 #' }
 #'
 #' @export
@@ -477,15 +477,15 @@ as_benchmark_aggr.BenchmarkResult = function(obj, task_id = "task_id", learner_i
 #'
 #' if (requireNamespaces(c("mlr3", "rpart"))) {
 #'   library(mlr3)
-#'   task = tsks(c("boston_housing", "mtcars"))
-#'   learns = lrns(c("regr.featureless", "regr.rpart"))
+#'   task = tsks(c("pima", "spam"))
+#'   learns = lrns(c("classif.featureless", "classif.rpart"))
 #'   bm = benchmark(benchmark_grid(task, learns, rsmp("cv", folds = 2)))
 #'
 #'   # default measure
 #'   as_benchmark_aggr(bm)
 #'
 #'   # change measure
-#'   as_benchmark_aggr(bm, measures = msr("regr.rmse"))
+#'   as_benchmark_aggr(bm, measures = msr("classif.acc"))
 #' }
 #'
 #' @export
